@@ -231,12 +231,14 @@ class LossODE:
             }
         )
 
+
     def tree_flatten(self):
         children = (self.initial_condition, self.loss_weights)
         aux_data = {
             "u": self.u,
             "dynamic_loss": self.dynamic_loss,
             "obs_slice": self.obs_slice,
+            "derivative_keys": self.derivative_keys
         }
         return (children, aux_data)
 
@@ -488,7 +490,7 @@ class SystemLossODE:
         # and update vmap_in_axes
         if batch.param_batch_dict is not None:
             # update params with the batches of generated params
-            params = _update_eq_params_dict(params, batch.param_batch_dict)
+            params_dict = _update_eq_params_dict(params_dict, batch.param_batch_dict)
 
         vmap_in_axes_params = _get_vmap_in_axes_params(
             batch.param_batch_dict, params_dict

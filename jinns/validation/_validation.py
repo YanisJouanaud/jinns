@@ -1,7 +1,7 @@
 """
 Implements some validation functions and their associated hyperparameter
 """
-
+import pickle
 import copy
 import abc
 from typing import Union
@@ -85,12 +85,57 @@ class ValidationLoss(AbstractValidationModule):
                 val_batch, self.validation_obs_data.get_batch()
             )
 
+        def better():
+            pass
         validation_loss_value, _ = self.loss(params, val_batch)
         (counter, best_val_loss) = jax.lax.cond(
             validation_loss_value < self.best_val_loss,
             lambda _: (jnp.array(0.0), validation_loss_value),  # reset
             lambda operands: (operands[0] + 1, operands[1]),  # increment
             (self.counter, self.best_val_loss),
+        )
+
+        # use eqx.tree_at to update attributes
+        # (https://github.com/patrick-kidger/equinox/issues/396)
+        new = eqx.tree_at(lambda t: t.counter, self, counter)
+        new = eqx.tree_at(lambda t: t.best_val_loss, new, best_val_loss)
+
+        bool_early_stopping = jax.lax.cond(
+            jnp.logical_and(
+                jnp.array(self.counter == self.patience),
+                jnp.array(self.early_stopping),
+            ),
+            lambda _: True,
+            lambda _: False,
+            None,
+        )
+        # return `new` cause no in-place modification of the eqx.Module
+        return (new, bool_early_stopping, validation_loss_value)
+
+
+class ValidationLossSimple(ValidationLoss):
+    custom_val_loss: Array = eqx.field(
+        converter=jnp.asarray, default_factory=lambda: jnp.array(1.0)
+    )
+
+    def __call__(self, params) -> tuple["ValidationLoss", Bool, Array]:
+        # do in-place mutation
+        val_batch = self.validation_data.get_batch()
+        if self.validation_param_data is not None:
+            val_batch = append_param_batch(
+                val_batch, self.validation_param_data.get_batch()
+            )
+        if self.validation_obs_data is not None:
+            val_batch = append_obs_batch(
+                val_batch, self.validation_obs_data.get_batch()
+            )
+
+        validation_loss_value, _ = self.loss(params, val_batch)
+        (counter, best_val_loss) = jax.lax.cond(
+            validation_loss_value > self.custom_val_loss,
+            lambda _: (jnp.array(0.0), validation_loss_value),  # reset
+            lambda operands: (operands[0] + 1, operands[1]),  # increment
+            (self.counter, self.custom_val_loss),
         )
 
         # use eqx.tree_at to update attributes
