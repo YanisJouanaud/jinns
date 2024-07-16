@@ -1,1 +1,1 @@
-from ._validation import AbstractValidationModule, ValidationLoss
+from ._validation import AbstractValidationModule, ValidationLoss, ValidationLossSimple

@@ -231,13 +231,14 @@ class LossODE:
             }
         )
 
+
     def tree_flatten(self):
         children = (self.initial_condition, self.loss_weights)
         aux_data = {
             "u": self.u,
             "dynamic_loss": self.dynamic_loss,
             "obs_slice": self.obs_slice,
-            "derivative_keys": self.derivative_keys,
+            "derivative_keys": self.derivative_keys
         }
         return (children, aux_data)
 
